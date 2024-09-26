@@ -7,6 +7,6 @@ import { ResumeComponent } from './resume/resume.component';
 export const routes: Routes = [
     { path: '', component: HomeComponent },
     { path: 'contact', component: ContactComponent },
-    { path: 'resume', component: ResumeComponent },
+    { path: 'cv', component: ResumeComponent },
     { path: 'impressum', component: ImpressumComponent },
 ];
