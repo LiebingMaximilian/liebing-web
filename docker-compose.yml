@@ -1,0 +1,8 @@
+services:
+  web:
+    image: ${IMAGE:-ghcr.io/liebingmaximilian/liebing-web:latest}
+    container_name: liebing-web
+    restart: unless-stopped
+    ports:
+      # Only reachable from the Pi itself; the host nginx proxies to it
+      - "127.0.0.1:8080:80"
