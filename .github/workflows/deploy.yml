@@ -47,6 +47,8 @@ jobs:
 
   deploy:
     needs: build
+    # The SSH_* secrets are stored in the 'production' environment
+    environment: production
     # Runs on GitHub's machines and connects to the server via SSH,
     # so nothing from this (public) repo ever executes a runner on the server.
     runs-on: ubuntu-latest
