@@ -47,29 +47,44 @@ jobs:
 
   deploy:
     needs: build
-    # Runs on the Raspberry Pi itself (self-hosted runner), so no SSH port has to be opened
-    runs-on: [self-hosted, linux, ARM64]
+    # Runs on GitHub's machines and connects to the server via SSH,
+    # so nothing from this (public) repo ever executes a runner on the server.
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: read
-    env:
-      IMAGE: ${{ needs.build.outputs.image }}:${{ github.sha }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Log in to GHCR
-        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+      - name: Copy docker-compose.yml to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          port: ${{ secrets.SSH_PORT }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          source: docker-compose.yml
+          target: /opt/liebing-web
 
-      - name: Pull and restart container
-        run: |
-          docker compose -p liebing-web pull
-          docker compose -p liebing-web up -d --remove-orphans
-
-      - name: Smoke test
-        run: |
-          sleep 3
-          curl -fsS http://127.0.0.1:8080/ | grep -q "<app-root"
-
-      - name: Remove old site images
-        if: always()
-        run: docker image prune -af --filter "label=app=liebing-web"
+      - name: Pull image and restart container
+        uses: appleboy/ssh-action@v1
+        env:
+          IMAGE: ${{ needs.build.outputs.image }}:${{ github.sha }}
+          GHCR_USER: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          port: ${{ secrets.SSH_PORT }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          envs: IMAGE,GHCR_USER,GHCR_TOKEN
+          script: |
+            set -e
+            cd /opt/liebing-web
+            echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
+            IMAGE="$IMAGE" docker compose -p liebing-web pull
+            IMAGE="$IMAGE" docker compose -p liebing-web up -d --remove-orphans
+            docker logout ghcr.io
+            sleep 3
+            curl -fsS http://127.0.0.1:8080/ | grep -q "<app-root"
+            docker image prune -af --filter "label=app=liebing-web"
